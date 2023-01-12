@@ -12,10 +12,10 @@ import plotly.express as px
 from autoencoder_module import HAELightingModule
 import pandas as pd
 
-BATCH_SIZE = 8
-NUM_SAMPLES = 9000
-LR = 0.0001
-MAX_EPOCHS = 5
+BATCH_SIZE = 16
+NUM_SAMPLES = 6000
+LR = 0.0002
+MAX_EPOCHS = 200
 HLLE_N_NEIGHBORS = 40
 SEED = 42
 
@@ -31,7 +31,7 @@ if __name__ == "__main__":
     logger = WandbLogger(project='disentanglement', name='hae_image_log_test')
     callbacks = [
         MetricsLoggerCallback(current_seed=SEED, hae_only=True), 
-        ImageReconstructionLoggerCallback(current_seed=SEED, multiple_seeds=False)
+        ImageReconstructionLoggerCallback(current_seed=SEED, epoch_level=1)
     ]
 
     trainer = Trainer(

@@ -48,9 +48,9 @@ def return_embedding_html(z_values: np.array, embedding: np.array, title: str):
     return html
 
 class ImageReconstructionLoggerCallback(pl.Callback):
-    def __init__(self, current_seed: int, multiple_seeds: bool = True):
+    def __init__(self, current_seed: int, epoch_level: int = 1):
         self.seed = current_seed
-        self.multiple_seeds = multiple_seeds
+        self.epoch_level = epoch_level
 
     def on_train_start(self, trainer, pl_module):
         self.wandb_logger = pl_module.logger
@@ -64,21 +64,22 @@ class ImageReconstructionLoggerCallback(pl.Callback):
         self.static_samples = torch.stack(static_samples, dim=0).to(pl_module.device)
 
     def on_train_epoch_end(self, trainer, pl_module):
-        with torch.no_grad():
-            #import pdb; pdb.set_trace()
-            z = pl_module.forward(self.static_samples, encoder=True)
-            reconstructions = pl_module.forward(z, encoder=False)
+        if trainer.current_epoch % self.epoch_level == 0:
+            with torch.no_grad():
+                #import pdb; pdb.set_trace()
+                z = pl_module.forward(self.static_samples, encoder=True)
+                reconstructions = pl_module.forward(z, encoder=False)
 
-        results = []
-        for (img, recon) in zip(self.static_samples, reconstructions):
-            results.append(img)
-            results.append(recon)
+            results = []
+            for (img, recon) in zip(self.static_samples, reconstructions):
+                results.append(img)
+                results.append(recon)
 
-        grid = make_grid(results, nrow=2)
+            grid = make_grid(results, nrow=2)
 
-        log_grid = wandb.Image(grid, caption="Left: Reference, Right: Reconstruction")
+            log_grid = wandb.Image(grid, caption="Left: Reference, Right: Reconstruction")
 
-        self.wandb_logger.experiment.log({f"Reconstructions seed={self.seed}": log_grid})
+            self.wandb_logger.experiment.log({f"Reconstructions seed={self.seed}": log_grid})
 
 
 class MetricsLoggerCallback(pl.Callback):

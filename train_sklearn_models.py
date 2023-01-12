@@ -23,10 +23,7 @@ def return_all_sklearn_embeddings(datamodule: pl.LightningDataModule) -> Dict:
         
     '''
     funcs = [train_pca_model]
-    X = datamodule.numpy_data.reshape(
-            datamodule.numpy_data.shape[0], 
-            datamodule.numpy_data.shape[-2]*datamodule.numpy_data.shape[-1]
-            )
+    X = datamodule.numpy_data.reshape(datamodule.numpy_data.shape[0], -1) # (N x H x W x C) -> (N x H*W*C)
     results = {}
     for func in funcs:
         func_name = str(func)

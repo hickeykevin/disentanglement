@@ -1,5 +1,5 @@
 wandb/
 env_disentanglement/
-distentanglement/
+disentanglement/
 __pycache__
 .vscode/
