@@ -64,7 +64,7 @@ class ImageReconstructionLoggerCallback(pl.Callback):
         self.static_samples = torch.stack(static_samples, dim=0).to(pl_module.device)
 
     def on_train_epoch_end(self, trainer, pl_module):
-        if trainer.current_epoch % self.epoch_level == 0:
+        if trainer.current_epoch % (self.epoch_level+1) == 0:
             with torch.no_grad():
                 #import pdb; pdb.set_trace()
                 z = pl_module.forward(self.static_samples, encoder=True)
