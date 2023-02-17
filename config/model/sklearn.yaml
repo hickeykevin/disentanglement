@@ -1,0 +1,12 @@
+_target_: src.models.sklearn_module.SklearnLightningModule
+
+methods: 
+  - _target_: sklearn.manifold.LocallyLinearEmbedding
+    method: hessian
+    n_neighbors: 40
+    n_components: 2
+    eigen_solver: 'dense'
+  - _target_: sklearn.decomposition.PCA
+    n_components: 2
+
+save_dir: ${paths.output_dir}

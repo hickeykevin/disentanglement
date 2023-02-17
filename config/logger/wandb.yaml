@@ -1,0 +1,11 @@
+wandb:
+  _target_: pytorch_lightning.loggers.wandb.WandbLogger
+  project: disentanglement
+  group: ""
+  job_type: ""
+  offline: False
+  id: null
+  log_model: False
+  prefix: ""
+  tags: []
+  save_dir: "${paths.output_dir}"

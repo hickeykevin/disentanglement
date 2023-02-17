@@ -1,0 +1,14 @@
+_target_: src.models.isometric_encoder.LightningIsometricEncoder
+
+optimizer: 
+  _target_: torch.optim.Adam
+  _partial_: True
+  lr: 0.0002
+  betas: 
+  - 0.9 
+  - 0.99
+  
+encoder: 
+  _target_: src.models.components.autoencoder_network.Shape_Encoder
+  code_dim: 2
+  input_channels: 1 

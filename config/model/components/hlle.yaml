@@ -1,0 +1,5 @@
+_target_: sklearn.manifold.LocallyLinearembedding
+method: hessian
+n_neighbors: 40
+n_components: 2
+eigen_solver: 'dense'

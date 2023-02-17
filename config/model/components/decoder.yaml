@@ -1,0 +1,5 @@
+decoder:
+  _target_: src.models.components.autoencoder_network.Shape_Decoder
+  code_dim: 2
+  input_channels: 1
+  vae: False

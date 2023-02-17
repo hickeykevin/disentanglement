@@ -1,0 +1,12 @@
+defaults:
+  - model_checkpoint.yaml
+  - metrics.yaml
+  - image_reconstruction.yaml
+  - _self_
+
+model_checkpoint:
+  dirpath: ${paths.output_dir}/checkpoints
+  filename: "epoch_{epoch:03d}"
+  save_top_k: 1
+  save_last: True
+  auto_insert_metric_name: False
