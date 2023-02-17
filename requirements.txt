@@ -5,3 +5,5 @@ torchvision
 plotly
 pandas
 wandb
+torchmetrics
+
