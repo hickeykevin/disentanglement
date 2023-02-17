@@ -1,75 +1,88 @@
 #%%
 import torch
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.ticker import NullFormatter
-from sklearn.manifold import LocallyLinearEmbedding
-from sklearn.decomposition import FastICA, PCA
-from sklearn.utils import check_random_state
-from dspirte import SquaresDataModule
-from PIL import Image
+from src.models.components.autoencoder_network import Shape_Encoder
+from src.models.isometric_encoder import LightningIsometricEncoder
+from src.data.dsprite import SquaresDataModule
+from typing import List, Dict, Tuple
+from omegaconf import DictConfig
+from hydra.utils import instantiate
+import pytorch_lightning as pl
+from tqdm import tqdm
+from src.utils.utils import get_pylogger
+import hydra
+from torchmetrics.functional import pairwise_euclidean_distance
+from torch.utils.data import TensorDataset, DataLoader
 
-dm = SquaresDataModule(3000, 16)
+
+log = get_pylogger(__name__)
+# python3 single_seed.py model=isometric_encoder trainer=cpu logger=wandb debug=default
+# def train(cfg: DictConfig) -> Tuple[dict, dict]:
+#     print(cfg)
+#     if cfg.get("seed"):
+#         pl.seed_everything(cfg.seed, workers=True)
+
+#     log.info(f"Instantiating datamodule <{cfg.data._target_}>")
+#     dm: pl.LightningDataModule = instantiate(cfg.data)
+
+#     log.info(f"Instantiating model <{cfg.model._target_}>")
+#     model: pl.LightningModule = instantiate(cfg.model)
+
+    
+#     log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
+#     trainer: pl.Trainer = instantiate(cfg.trainer)
+
+#     if cfg.get("train"):
+#         log.info("Begin training!")
+#         trainer.fit(model=model, datamodule=dm, ckpt_path=cfg.get("ckpt_path"))
+
+
+# @hydra.main(version_base=None, config_path="config", config_name="train")
+# def main(cfg: DictConfig):
+#     train(cfg=cfg)
+
+
+# if __name__ == "__main__":
+#     main() 
+
+# def batch_jacobian(func, x, create_graph=False):
+#     #https://discuss.pytorch.org/t/computing-batch-jacobian-efficiently/80771/5
+#     #func: Function you want to compute jacobian for. Probably your network
+#     #x: Batch of input instances of shape (batch_size, N). if x is an image flatten all dims except batch
+#     def _func_sum(x):
+#         x = x.view(-1, 1, 64, 64)
+#         return func(x).view(-1, 1).sum(dim=0)
+#     return torch.autograd.functional.jacobian(_func_sum, x, create_graph=create_graph).permute(1,0,2)
+
+
+#%%
+Enc = Shape_Encoder(2, 1)
+dm = SquaresDataModule(1000, 10, num_workers=1)
 dm.setup('fit')
-X = dm.numpy_data
-X = X.reshape(X.shape[0], X.shape[-2]*X.shape[-1])
-#%%
-# find "distance" values between input data points
-# filter for 5% lowest distance values
-# calculate coeff scores of above and corresponding hlle embedding representation
-## note: think it will be vector of distances vs vector of distances
-    ## will thus be np.corrcoef(realvector_distances, embeddingvector_distances)
-# note, hlle embedding will be reparamaterized, but skipping for now
-# loop over values of k, calculating step 3 for all values of k
-from scipy.spatial import distance_matrix
-fake_X_index = np.random.choice(X.shape[0], 300, replace=False)
-fake_X = X[fake_X_index]
-fake_X_distances = distance_matrix(fake_X, fake_X)
+loader = dm.train_dataloader()
 
-# filtering smallest 5% of distances
-
-# store all i,j coordinates and distanve values, filter out all 0 values
-results = []
-for i in range(fake_X_distances.shape[0]):
-    for j in range(fake_X_distances.shape[1]):
-        value = fake_X_distances[i, j]
-        if value == 0.0:
-            continue
-        else:
-            results.append((i,j,value))
-
-# sort the remaining distance values, keeping (i,j) coordinates
-results = sorted(results, key=lambda x: x[-1])
-
-# filter lowest 5% of i,j pair distance values
-num = int(len(results) * 0.05) 
-results = results[:num]
-
-#store indicies and X distance values
-indicies = [(x[0], x[1]) for x in results]
-fake_X_distance_values = [x[2] for x in results]
 
 #%%
-# embedding values 
-for k in range(15, 20):
-    hlle = LocallyLinearEmbedding(
-        n_neighbors=k,
-        method='hessian',
-        random_state=42,
-        n_components=2,
-        eigen_solver='dense'
-    )
-    hlle_embedding = hlle.fit_transform(fake_X)
+torch_X = torch.from_numpy(dm.numpy_data).permute(0, -1, -2, -3).float().unique(dim=0)
+X = torch.from_numpy(dm.numpy_data.reshape(1000, -1)).float().unique(dim=0)
+distances = pairwise_euclidean_distance(X)
+distances = torch.where(distances == 0.0, 1e9, distances)
+smallest_5_percent = torch.quantile(distances.flatten(), 0.05, interpolation='nearest')
+indicies = (distances < smallest_5_percent).nonzero().tolist()
+i = [idx[0] for idx in indicies]
+j = [idx[1] for idx in indicies]
 
-    # create distance matrix on embedding representations
-    hlle_embedding_distances = distance_matrix(hlle_embedding, hlle_embedding)
+X_distances = distances[i, j]
+#%%
+encodings = Enc(torch_X)
 
-    # store the corresponding i,j coordinates embedding distance values
-    hlle_distance_results = []
-    for i, j in indicies:
-        hlle_distance_results.append(hlle_embedding_distances[i, j])
-    corr_coef = np.corrcoef(fake_X_distance_values, hlle_distance_results)[1,0]
-    print(k, corr_coef)
+#%%
+distances_encodings = pairwise_euclidean_distance(encodings)
+correspondnig_distance_encodings = distances_encodings[i, j]
+#%%
+final_result = torch.stack((X_distances, correspondnig_distance_encodings), dim=1).permute(1, 0)
+corr = torch.corrcoef(final_result)
+print(corr)
+
 
 
 
@@ -84,36 +97,35 @@ for k in range(15, 20):
 
 
 #%%
-# Variables for manifold learning.
-hlle_n_neighbors = 30
-random_state = 42
+# Test of above with random numbers
+torch_X = torch.randn(1000, 1, 64, 64)
+X = torch_X.view(1000, -1)
+distances = pairwise_euclidean_distance(X)
+distances = torch.where(distances == 0.0, 1e9, distances)
+smallest_5_percent = distances.flatten().sort()[0][int(1000*1000*0.05)].item()
+indicies = (distances < smallest_5_percent).nonzero().tolist()
+i = [idx[0] for idx in indicies]
+j = [idx[1] for idx in indicies]
 
-plotting_hlle = LocallyLinearEmbedding(
-    n_components=2,
-    n_neighbors=hlle_n_neighbors,
-    method='hessian',
-    random_state=random_state
-)
-
-hlle = LocallyLinearEmbedding(
-    n_neighbors=hlle_n_neighbors,
-    method='hessian',
-    random_state=random_state,
-    n_components=2,
-    eigen_solver='dense'
-)
-fica = FastICA(
-    n_components=2,
-    whiten='warn',
-    random_state=random_state
-)
+X_distances = distances[i, j]
+encodings = Enc(torch_X)
+distances_encodings = pairwise_euclidean_distance(encodings)
+correspondnig_distance_encodings = distances_encodings[i, j]
+final_result = torch.stack((X_distances, correspondnig_distance_encodings), dim=1).permute(1, 0)
+corr = torch.corrcoef(final_result)
 
 
 
 
-#%% Main method
-hlle_embedding = hlle.fit_transform(all_data)
-ica_hlle_embedding = fica.fit_transform(hlle_embedding)
 
 
+# cos = torch.nn.CosineSimilarity(dim=0, eps=1e-6)
+# pearson = cos(X_distances - X_distances.mean(), correspondnig_distance_encodings - correspondnig_distance_encodings.mean())
 
+# output = batch_jacobian(Enc, X).view(10, 1, 64, 64)
+# output_T = torch.transpose(output, -2, -1)
+# result = torch.matmul(output_T, output)
+# I = torch.stack([torch.eye(64) for _ in range(10)])
+# print(torch.norm((result - I), p="fro"))
+
+# %%
