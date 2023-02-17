@@ -12,7 +12,7 @@ from src.utils.utils import get_pylogger
 import hydra
 from torchmetrics.functional import pairwise_euclidean_distance
 from torch.utils.data import TensorDataset, DataLoader
-
+print("hi")
 
 log = get_pylogger(__name__)
 # python3 single_seed.py model=isometric_encoder trainer=cpu logger=wandb debug=default
